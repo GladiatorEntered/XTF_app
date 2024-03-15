@@ -1,0 +1,203 @@
+#!/bin/bash --posix
+
+cargs=()
+curs=()
+cargsflag=0
+ballance=()
+
+concat(){	
+	for logfile in "$@"
+	do
+		expr "$logfile" : '.*\.gz$' > /dev/null && { 
+			gunzip -dc "$logfile" 
+		} || cat "$logfile"
+	done
+}
+
+filters(){
+	while IFS= read zaznam
+	do
+		expr "$(echo $zaznam | cut -d ';' -f2)" \< "${before-"9999-99-99 99:99:99"}" > /dev/null && expr "$(echo $zaznam | cut -d ';' -f2)" \> "${after-"0000-00-00 00:00:00"}" >/dev/null && expr "$(echo $zaznam | cut -d ';' -f1)" = "$username" > /dev/null && {
+			for currency in "${cargs[@]}"
+			do
+				expr "$zaznam" : '.*;[^;]*'$currency'[^;]*;.*' > /dev/null && echo "$zaznam" && break
+			done
+		} || :
+	done
+	echo $exitflag > exitflag.txt
+}
+
+
+search_curr(){
+	cut -d ';' -f3 | sort | uniq
+}
+
+list(){
+	cat
+}
+
+status(){
+	while IFS= read zaznam
+	do
+		currency=0
+		while expr $currency \< ${#curs[@]} > /dev/null
+		do
+			expr "$zaznam" : '.*;'${curs[$currency]}';.*' > /dev/null && ballance[$currency]=$(awk "BEGIN { printf \"%.4f\", ${ballance[$currency]} + $(echo $zaznam | cut -d ';' -f4) }")
+			currency=$(expr $currency + 1)
+		done
+	done
+	currency=0
+	while expr $currency \< ${#curs[@]} > /dev/null
+	do
+		echo "${curs[$currency]} : ${ballance[$currency]}"
+		currency=$(expr $currency + 1)
+	done
+}
+
+profit(){
+	status | while IFS= read -r record
+	do
+		#echo $record
+		curr_ballance=$(echo $record | cut -d ' ' -f3)
+		#echo $curr_ballance
+		profit=$(echo $curr_ballance | sed -E 's/-(.*)/\1/')
+		expr "$curr_ballance" : '.*-.*' > /dev/null || profit=$(awk "BEGIN { printf \"%.4f\", $curr_ballance * ((100 + ${XTF_PROFIT-"20"})/100) }")
+		#echo $profit
+		echo $record | sed 's/[0-9][^\s]*[0-9]/'$profit'/'
+	done
+}
+
+
+ops=$(getopt -o ha:b:c: --long help -- "$@")
+eval set -- $ops
+while true 
+do
+	case "$1" in 
+		-a) if expr "$2" : '-.*' > /dev/null
+			then
+				echo "ERROR: -a requires an argument!" >&2
+				exit 1
+			fi
+			expr "${after-"DEF"}" : 'DEF' > /dev/null || {
+				echo "Error: multiple -a arguments!" >&2
+				exit 1
+			}
+			after="$2"
+			shift 2
+			;;
+		-b) if expr "$2" : '-.*' > /dev/null
+			then
+				echo "ERROR: -a requires an argument!" >&2
+				exit 1
+			fi
+			expr "${before-"DEF"}" : 'DEF' > /dev/null || {
+				echo "Error: multiple -b arguments!" >&2
+				exit 1
+			}
+			before="$2"
+			shift 2
+			;;
+		-c) if expr "$2" : '-.*' > /dev/null
+			then
+				echo "ERROR: -a requires an argument!" >&2
+				exit 1
+			fi
+			cargs+=("$2")
+			shift 2
+			;;
+		-h|--help) echo "NO HELP DUDE!"
+			exit 0
+			;;
+		--) shift
+			break
+			;;
+		*) echo "ERROR: bad argument \""$2"\"!" 
+			;;
+	esac
+done
+
+while true
+do
+	expr "$1" : '.*\.log.*' > /dev/null && break
+	[ "$1" = "list" -o "$1" = "status" -o "$1" = "profit" -o "$1" = "list-currency" ] && {  #if one of legal commands then
+		expr ${prikaz-''} = '' > /dev/null || {          #if prikaz is already defined then
+			echo "Error: multiple commands!" >&2     #error message
+			exit 2
+		}
+		prikaz="$1" 					 #give prikaz a value (if one of legal commands)
+	       	expr "$1" = "list-currency" > /dev/null && prikaz="search_curr" 	#if argument is list-currency define a special name
+		echo true > /dev/null							#crutch. If it isn't there, some expressions could pass through "else"
+	} || {										#else	
+		       expr "$1" : '.*\.log.*' >/dev/null || {
+		       expr ${username-''} = '' > /dev/null || {
+				echo "Error: multiple usernames!" >&2
+				exit 2
+	       		}
+			username="$1"
+	       }		       #if it is not a log file this is a username 
+	}
+	shift
+done
+#echo $username
+
+[ $(expr "${before-"9999-99-99 99:99:99"}" : '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}') -eq 0 -o $(expr "${after-"0000-00-00 00:00:00"}" : '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}') -eq 0 ] && {
+	echo "Error: Incorrect datetime format! Try \"yyyy-mm-dd hh:mm:ss\"." >&2
+	exit 2		#podminka okamziteho ukonceni (datetime)
+}
+
+expr "${before-"9999-99-99 99:99:99"}" \<= "${after-"0000-00-00 00:00:00"}" > /dev/null && {
+	echo "Error: \"before\" argument should be greater then \"after\"!" >&2
+	exit 2
+}
+
+expr "${username-""}" = '' > /dev/null && {
+	echo "Error: Specify your username!" >&2
+	exit 2
+}
+
+expr "$#" = 0 > /dev/null && {
+	echo "Error: No logs to process!" >&2
+	exit 2
+}
+
+for logfile in "$@"
+do
+	[ -f "$logfile" ] || {
+		echo "Error: Invalid log file "$logfile"!" >&2
+		exit 2
+	}
+done
+
+expr ${#cargs[@]} = 0 > /dev/null && {
+	for currency in $(concat "$@" | cut -d ';' -f3 | sort | uniq) 
+	do
+		cargs+=("$currency")
+	done
+	}
+
+for currency in $(concat "$@" | filters | search_curr) 
+do
+	curs+=("$currency")
+	ballance+=("0")
+done
+
+datetime="0000-00-00 00:00:00"
+while IFS= read -r line
+do
+	col1=$(echo "$line" | cut -d ';' -f1)
+	col2=$(echo "$line" | cut -d ';' -f2)
+	col3=$(echo "$line" | cut -d ';' -f3)
+	col4=$(echo "$line" | cut -d ';' -f4)
+	expr "$datetime" \> "$col2" > /dev/null && {
+		echo "Warning: Records are not chronologically sorted!" >&2
+		#exit 3
+	}
+	#datetime="$col2"
+	[ "$col1" = '' -o $(expr "$col2" : '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}') -eq 0 -o "$col3" = '' -o "$col4" = '' ] && {
+		echo "Error: There are invalid lines in your log files!" >&2
+		exit 3
+	}
+done < <(concat "$@")
+
+
+concat "$@" | filters | ${prikaz-"list"}
