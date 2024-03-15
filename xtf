@@ -2,7 +2,6 @@
 
 cargs=()
 curs=()
-cargsflag=0
 ballance=()
 
 tutorial(){
