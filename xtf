@@ -233,7 +233,7 @@ do
 		echo "Warning: Records are not chronologically sorted!" >&2
 		#exit 3
 	}
-	#datetime="$col2"
+	datetime="$col2"
 	[ "$col1" = '' -o $(expr "$col2" : '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} [0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}') -eq 0 -o "$col3" = '' -o "$col4" = '' ] && {
 		echo "Error: There are invalid lines in your log files!" >&2
 		exit 3
