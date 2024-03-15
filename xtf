@@ -5,6 +5,48 @@ curs=()
 cargsflag=0
 ballance=()
 
+tutorial(){
+	echo "	Hi again!
+
+        	If %username% reads this, it seems that you have troubles with using Gladiator's second significant project - XTF stock market helper!
+
+
+
+		===HOWTO===
+
+		...use it?						Run xtf with the following syntax:	./xtf [flags] [command] username logfile(s).log
+
+		...see all my transactions?				The command you need is \"list\". 
+									Although, if you run the script without any command, it will do \"list\" by default.
+
+		...see all my wallets?					Run with \"list-currency\" command.
+
+		...see my current ballance?				Run with \"status\" command.
+
+		...see my possible profit?				Run with \"profit\" command. Profit will be calculated based on your "'$XTF_PROFIT'" environment variable
+									If it is not set, the default profit value is 20 (percent).
+
+		...process transactions starting from some moment?	Run with -a flag. It requres a datetime value in the format \"yyyy-mm-dd hh:mm:ss\".
+									Datetime should be surrounded by quotes, otherwise XTF won't process them correctly.
+
+		...process transactions before some moment?		Same as previous, but with -b flag.
+		
+		...filter results based on some currency name?		Run with -c flag, e.g. ./xtf -c USD username logfile(s).log
+									You can provide as many currencies as you wish.
+									
+
+
+		==FAQ==
+
+		In which format should be transaction records?		USERNAME;DATETIME;CURRENCY;ALMOUNT
+									Each .log file should contain records sorted by DATETIME - oldest to newest.
+									If you provide more than one logfile, check if they are also do in chronological order!
+
+		What is concidered as a valid logfile?			Any file with records in valid format, its name should end with .log or .log.gz. Yes it can process .gz archives.
+		
+		Can I process .gz archives as logfiles?			YES."
+}
+
 concat(){	
 	for logfile in "$@"
 	do
@@ -105,7 +147,7 @@ do
 			cargs+=("$2")
 			shift 2
 			;;
-		-h|--help) echo "NO HELP DUDE!"
+		-h|--help) tutorial 
 			exit 0
 			;;
 		--) shift
